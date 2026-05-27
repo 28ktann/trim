@@ -12,7 +12,7 @@ export default function SignupPage() {
   const [slug, setSlug] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-
+  const RESERVED_SLUGS = ["login", "signup", "dashboard", "book", "playground", "api", "admin"]
   // Auto-format the slug: lowercase, no spaces, only letters/numbers/hyphens
   function handleSlugChange(value: string) {
     const cleaned = value
@@ -25,6 +25,11 @@ export default function SignupPage() {
   async function handleSignup() {
     setLoading(true)
     setError("")
+    if (RESERVED_SLUGS.includes(slug)) {
+      setError("That link is reserved — please choose another.")
+      setLoading(false)
+      return
+    }
 
     // 1. Check the slug isn't already taken
     const { data: existing } = await supabase

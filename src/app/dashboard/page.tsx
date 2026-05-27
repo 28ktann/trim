@@ -36,6 +36,11 @@ export default function Dashboard() {
   const [newDuration, setNewDuration] = useState("")
   const [newPrice, setNewPrice] = useState("")
   const [adding, setAdding] = useState(false)
+  // Recovery form (for users with an account but no business yet)
+  const [recoverName, setRecoverName] = useState("")
+  const [recoverSlug, setRecoverSlug] = useState("")
+  const [recoverError, setRecoverError] = useState("")
+  const [recovering, setRecovering] = useState(false)
 
   async function loadServices(businessId: string) {
     const { data } = await supabase
@@ -126,6 +131,65 @@ export default function Dashboard() {
     .slice(0, 2)
     .toUpperCase() ?? ""
 
+  const RESERVED_SLUGS = ["login", "signup", "dashboard", "book", "playground", "api", "admin"]
+
+  function handleRecoverSlugChange(value: string) {
+    const cleaned = value
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+    setRecoverSlug(cleaned)
+  }
+
+  async function handleRecoverBusiness() {
+    setRecovering(true)
+    setRecoverError("")
+
+    if (RESERVED_SLUGS.includes(recoverSlug)) {
+      setRecoverError("That link is reserved — please choose another.")
+      setRecovering(false)
+      return
+    }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push("/login")
+      return
+    }
+
+    // Check slug isn't taken
+    const { data: existing } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("slug", recoverSlug)
+      .maybeSingle()
+
+    if (existing) {
+      setRecoverError("That link is already taken — try another.")
+      setRecovering(false)
+      return
+    }
+
+    const { data: biz, error } = await supabase
+      .from("businesses")
+      .insert({ name: recoverName, slug: recoverSlug, owner_id: user.id })
+      .select("id, name")
+      .single()
+
+    setRecovering(false)
+
+    if (error || !biz) {
+      setRecoverError("Could not create business. Try again.")
+      console.error(error)
+      return
+    }
+
+    setBusiness(biz)
+  }
+
+  
+
+
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push("/login")
@@ -138,7 +202,60 @@ export default function Dashboard() {
       </main>
     )
   }
+  if (!business) {
+    return (
+      <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-sm bg-white border border-gray-200 rounded-2xl p-8">
+          <h1 className="text-lg font-medium text-gray-900 mb-1">Finish setting up</h1>
+          <p className="text-xs text-gray-500 mb-6">
+            Your account is ready — just create your booking page.
+          </p>
 
+          <input
+            type="text"
+            value={recoverName}
+            onChange={(e) => setRecoverName(e.target.value)}
+            placeholder="Business name"
+            className="w-full p-3 mb-3 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400"
+          />
+
+          <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden mb-3">
+            <span className="px-3 py-3 bg-gray-50 text-sm text-gray-400 border-r border-gray-200">
+              trim.com/
+            </span>
+            <input
+              type="text"
+              value={recoverSlug}
+              onChange={(e) => handleRecoverSlugChange(e.target.value)}
+              placeholder="your-name"
+              className="flex-1 p-3 text-sm text-gray-900 placeholder-gray-400 outline-none"
+            />
+          </div>
+
+          {recoverError && <p className="text-xs text-red-500 mb-3">{recoverError}</p>}
+
+          <button
+            onClick={handleRecoverBusiness}
+            disabled={!recoverName || !recoverSlug || recovering}
+            className={`w-full py-3 text-sm font-medium rounded-lg ${
+              !recoverName || !recoverSlug || recovering
+                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                : "bg-gray-900 text-white hover:bg-gray-700"
+            }`}
+          >
+            {recovering ? "Creating..." : "Create my page"}
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="w-full text-xs text-gray-400 hover:text-gray-600 mt-4"
+          >
+            Log out
+          </button>
+        </div>
+      </main>
+    )
+  }
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="max-w-3xl mx-auto">
