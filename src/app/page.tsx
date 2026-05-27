@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-white flex flex-col items-center justify-center px-6">
@@ -7,20 +9,26 @@ export default function Home() {
       </p>
 
       <h1 className="text-4xl font-medium text-gray-900 tracking-tight mb-3 text-center">
-        Bookings, simplified.
+        Your booking page,<br />ready in 60 seconds.
       </h1>
 
       <p className="text-base text-gray-500 max-w-sm text-center leading-relaxed mb-8">
-        A booking system built for independent barbers. No commissions. No middlemen.
+        A beautiful booking page built for independent nail & lash techs. Flat fee. No commissions.
       </p>
 
       <div className="flex gap-3 mb-16">
-        <button className="px-5 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700">
-          See it in action
-        </button>
-        <button className="px-5 py-2.5 border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">
-          Barber dashboard
-        </button>
+        <Link
+          href="/pricing"
+          className="px-5 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700"
+        >
+          View pricing
+        </Link>
+        <Link
+          href="/cosmos"
+          className="px-5 py-2.5 border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+        >
+          See a demo
+        </Link>
       </div>
 
       <div className="grid grid-cols-3 gap-6 max-w-2xl w-full">

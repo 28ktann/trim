@@ -46,7 +46,62 @@ export default function BookingClient({
     .join("")
     .slice(0, 2)
     .toUpperCase()
+  function generateICS() {
+    if (!chosenService || !selectedTime) return ""
 
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    const [hours, minutes] = selectedTime.split(":")
+    tomorrow.setHours(Number(hours), Number(minutes), 0, 0)
+
+    const endTime = new Date(tomorrow.getTime() + chosenService.duration_minutes * 60000)
+
+    // Format dates as YYYYMMDDTHHmmssZ (UTC)
+    const formatDate = (date: Date) =>
+      date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z"
+
+    const start = formatDate(tomorrow)
+    const end = formatDate(endTime)
+    const now = formatDate(new Date())
+
+    const uid = `${Date.now()}@trim.com`
+
+    return [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Trim//Booking//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "BEGIN:VEVENT",
+      `UID:${uid}`,
+      `DTSTAMP:${now}`,
+      `DTSTART:${start}`,
+      `DTEND:${end}`,
+      `SUMMARY:${chosenService.name} at ${business.name}`,
+      `DESCRIPTION:Booking for ${name} — ${chosenService.name} (£${chosenService.price})`,
+      `LOCATION:${business.address ?? business.name}`,
+      "BEGIN:VALARM",
+      "TRIGGER:-P1D",
+      "ACTION:DISPLAY",
+      "DESCRIPTION:Reminder",
+      "END:VALARM",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n")
+  }
+
+  function handleAddToCalendar() {
+    const ics = generateICS()
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = "appointment.ics"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
   async function handleConfirm() {
     if (!chosenService || !selectedTime) return
 
@@ -97,11 +152,22 @@ export default function BookingClient({
               <span className="text-gray-500">Time</span>
               <span className="font-medium text-gray-900">Tomorrow, {selectedTime}</span>
             </div>
-            <div className="flex justify-between py-1 text-sm border-t border-gray-200 mt-2 pt-2">
+           <div className="flex justify-between py-1 text-sm border-t border-gray-200 mt-2 pt-2">
               <span className="text-gray-500">Total</span>
               <span className="font-medium text-gray-900">£{chosenService.price}</span>
             </div>
           </div>
+
+          <button
+            onClick={handleAddToCalendar}
+            className="w-full mt-4 py-3 text-sm font-medium rounded-lg border border-gray-200 text-gray-900 hover:bg-gray-50"
+          >
+            Add to calendar
+          </button>
+
+          <p className="text-xs text-gray-400 mt-2">
+            We'll remind you 1 day before.
+          </p>
         </div>
       </main>
     )
