@@ -22,6 +22,9 @@ type Service = {
 type Business = {
   id: string
   name: string
+  working_days: number[]
+  open_time: string
+  close_time: string
 }
 
 export default function Dashboard() {
@@ -36,11 +39,19 @@ export default function Dashboard() {
   const [newDuration, setNewDuration] = useState("")
   const [newPrice, setNewPrice] = useState("")
   const [adding, setAdding] = useState(false)
-  // Recovery form (for users with an account but no business yet)
+
+  // Recovery form
   const [recoverName, setRecoverName] = useState("")
   const [recoverSlug, setRecoverSlug] = useState("")
   const [recoverError, setRecoverError] = useState("")
   const [recovering, setRecovering] = useState(false)
+
+  // Working hours
+  const [workingDays, setWorkingDays] = useState<number[]>([])
+  const [openTime, setOpenTime] = useState("09:00")
+  const [closeTime, setCloseTime] = useState("17:00")
+  const [savingHours, setSavingHours] = useState(false)
+  const [hoursMessage, setHoursMessage] = useState("")
 
   async function loadServices(businessId: string) {
     const { data } = await supabase
@@ -61,7 +72,7 @@ export default function Dashboard() {
 
       const { data: biz } = await supabase
         .from("businesses")
-        .select("id, name")
+        .select("id, name, working_days, open_time, close_time")
         .eq("owner_id", user.id)
         .single()
 
@@ -70,6 +81,9 @@ export default function Dashboard() {
         return
       }
       setBusiness(biz)
+      setWorkingDays(biz.working_days ?? [1, 2, 3, 4, 5])
+      setOpenTime((biz.open_time ?? "09:00").slice(0, 5))
+      setCloseTime((biz.close_time ?? "17:00").slice(0, 5))
 
       const { data: bookingData } = await supabase
         .from("bookings")
@@ -121,16 +135,6 @@ export default function Dashboard() {
     await loadServices(business.id)
   }
 
-  const totalBookings = bookings.length
-  const totalRevenue = bookings.reduce((sum, b) => sum + (b.services?.price || 0), 0)
-
-  const initials = business?.name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() ?? ""
-
   const RESERVED_SLUGS = ["login", "signup", "dashboard", "book", "playground", "api", "admin"]
 
   function handleRecoverSlugChange(value: string) {
@@ -157,7 +161,6 @@ export default function Dashboard() {
       return
     }
 
-    // Check slug isn't taken
     const { data: existing } = await supabase
       .from("businesses")
       .select("id")
@@ -173,7 +176,7 @@ export default function Dashboard() {
     const { data: biz, error } = await supabase
       .from("businesses")
       .insert({ name: recoverName, slug: recoverSlug, owner_id: user.id })
-      .select("id, name")
+      .select("id, name, working_days, open_time, close_time")
       .single()
 
     setRecovering(false)
@@ -185,15 +188,59 @@ export default function Dashboard() {
     }
 
     setBusiness(biz)
+    setWorkingDays(biz.working_days ?? [1, 2, 3, 4, 5])
+    setOpenTime((biz.open_time ?? "09:00").slice(0, 5))
+    setCloseTime((biz.close_time ?? "17:00").slice(0, 5))
   }
 
-  
+  function toggleWorkingDay(day: number) {
+    if (workingDays.includes(day)) {
+      setWorkingDays(workingDays.filter((d) => d !== day))
+    } else {
+      setWorkingDays([...workingDays, day].sort())
+    }
+  }
 
+  async function handleSaveHours() {
+    if (!business) return
+    setSavingHours(true)
+    setHoursMessage("")
+
+    const { error } = await supabase
+      .from("businesses")
+      .update({
+        working_days: workingDays,
+        open_time: openTime,
+        close_time: closeTime,
+      })
+      .eq("id", business.id)
+
+    setSavingHours(false)
+
+    if (error) {
+      console.error("Error saving hours:", error)
+      setHoursMessage("Could not save. Try again.")
+      return
+    }
+
+    setHoursMessage("Saved.")
+    setTimeout(() => setHoursMessage(""), 2000)
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push("/login")
   }
+
+  const totalBookings = bookings.length
+  const totalRevenue = bookings.reduce((sum, b) => sum + (b.services?.price || 0), 0)
+
+  const initials = business?.name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() ?? ""
 
   if (loading) {
     return (
@@ -202,6 +249,7 @@ export default function Dashboard() {
       </main>
     )
   }
+
   if (!business) {
     return (
       <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
@@ -256,6 +304,7 @@ export default function Dashboard() {
       </main>
     )
   }
+
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="max-w-3xl mx-auto">
@@ -284,6 +333,67 @@ export default function Dashboard() {
             <p className="text-xs text-gray-500 mb-1">Total revenue</p>
             <p className="text-2xl font-medium text-gray-900">£{totalRevenue}</p>
           </div>
+        </div>
+
+        {/* WORKING HOURS */}
+        <p className="text-xs tracking-widest text-gray-400 uppercase mb-3">Working hours</p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-8">
+          <p className="text-xs font-medium text-gray-700 mb-3">Days you work</p>
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {[
+              { num: 1, label: "Mon" },
+              { num: 2, label: "Tue" },
+              { num: 3, label: "Wed" },
+              { num: 4, label: "Thu" },
+              { num: 5, label: "Fri" },
+              { num: 6, label: "Sat" },
+              { num: 0, label: "Sun" },
+            ].map((day) => (
+              <button
+                key={day.num}
+                onClick={() => toggleWorkingDay(day.num)}
+                className={`px-3 py-2 rounded-lg border text-xs font-medium ${
+                  workingDays.includes(day.num)
+                    ? "border-gray-900 bg-gray-900 text-white"
+                    : "border-gray-200 text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                {day.label}
+              </button>
+            ))}
+          </div>
+
+          <p className="text-xs font-medium text-gray-700 mb-3">Hours</p>
+          <div className="flex items-center gap-2 mb-4">
+            <input
+              type="time"
+              value={openTime}
+              onChange={(e) => setOpenTime(e.target.value)}
+              className="flex-1 p-2.5 border border-gray-200 rounded-lg text-sm text-gray-900"
+            />
+            <span className="text-xs text-gray-400">to</span>
+            <input
+              type="time"
+              value={closeTime}
+              onChange={(e) => setCloseTime(e.target.value)}
+              className="flex-1 p-2.5 border border-gray-200 rounded-lg text-sm text-gray-900"
+            />
+          </div>
+
+          <button
+            onClick={handleSaveHours}
+            disabled={savingHours || workingDays.length === 0}
+            className={`w-full py-2.5 text-sm font-medium rounded-lg ${
+              savingHours || workingDays.length === 0
+                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                : "bg-gray-900 text-white hover:bg-gray-700"
+            }`}
+          >
+            {savingHours ? "Saving..." : "Save hours"}
+          </button>
+          {hoursMessage && (
+            <p className="text-xs text-gray-500 mt-2 text-center">{hoursMessage}</p>
+          )}
         </div>
 
         {/* SERVICES MANAGER */}
